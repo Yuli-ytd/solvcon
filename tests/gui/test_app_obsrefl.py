@@ -118,7 +118,7 @@ class ObsreflAppTC(_AppFixture, unittest.TestCase):
         panel = feature._panel
         session = control.session
         viewer = self.mgr.currentR3DWidget()
-        error = panel._freestream._configuration_error
+        message = panel._freestream._message
 
         panel._freestream._angle.setValue(22.0)
 
@@ -126,21 +126,79 @@ class ObsreflAppTC(_AppFixture, unittest.TestCase):
         self.assertIs(session, control.session)
         self.assertIs(viewer, self.mgr.currentR3DWidget())
         self.assertFalse(control._timer.isActive())
-        self.assertFalse(error.isHidden())
-        title = error.findChild(QLabel, "configurationErrorTitle")
+        self.assertFalse(message.isHidden())
+        title = message.findChild(QLabel, "messageTitle")
         self.assertEqual("Invalid configuration", title.text())
 
         control.remesh()
         self.assertIs(session, control.session)
         self.assertIs(viewer, self.mgr.currentR3DWidget())
-        self.assertFalse(error.isHidden())
+        self.assertFalse(message.isHidden())
 
         panel._freestream._angle.setValue(20.0)
         control.start()
         control._timer.stop()
 
         self.assertIsNot(session, control.session)
-        self.assertTrue(error.isHidden())
+        self.assertFalse(message.isHidden())
+        self.assertEqual("Three-zone analytic solution does not apply",
+                         title.text())
+        self.assertEqual("", panel._freestream._angle_outline.styleSheet())
+
+    def test_the_analytic_warning_allows_start_and_remesh(self):
+        feature = self._feature()
+        self._coarsen(feature)
+        control, panel = feature._control, feature._panel
+        message = panel._freestream._message
+        title = message.findChild(QLabel, "messageTitle")
+        style = message.styleSheet()
+        self.assertTrue(message.isHidden())
+
+        for action, running in ((panel._run._start.click, True),
+                                (panel._numerics._remesh.click, False)):
+            with self.subTest(running=running):
+                session = control.session
+                panel._freestream._angle.setValue(15.0)
+                action()
+                self.assertEqual(running, control._timer.isActive())
+                control._timer.stop()
+                self.assertIsNot(session, control.session)
+                self.assertAlmostEqual(
+                    15.0, np.degrees(control.session.shock.theta))
+                self.assertFalse(message.isHidden())
+                self.assertEqual(
+                    "The reflected shock reaches the top inlet.",
+                    panel._freestream._message_detail.text())
+                self.assertEqual(
+                    "Three-zone analytic solution does not apply",
+                    title.text())
+                self.assertEqual(style, message.styleSheet())
+                self.assertEqual(
+                    "", panel._freestream._angle_outline.styleSheet())
+                control._on_step()
+                self.assertGreater(control.session.step, 0)
+
+                session = control.session
+                panel._freestream._angle.setValue(22.0)
+                action()
+                self.assertIs(session, control.session)
+                self.assertFalse(message.isHidden())
+                self.assertEqual("Invalid configuration", title.text())
+                self.assertTrue(
+                    panel._freestream._angle_outline.styleSheet())
+
+                panel._freestream._angle.setValue(10.0)
+                action()
+                control._timer.stop()
+                self.assertTrue(message.isHidden())
+                self.assertEqual(
+                    "", panel._freestream._angle_outline.styleSheet())
+
+        panel._freestream._angle.setValue(15.0)
+        control.remesh()
+        self.assertFalse(message.isHidden())
+        control.reset()
+        self.assertTrue(message.isHidden())
 
     def test_the_resolution_reaches_the_mesh(self):
         feature = self._feature()

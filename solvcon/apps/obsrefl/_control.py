@@ -113,6 +113,7 @@ class RunController(object):
         self._colorizer = None
         self._viewer.close()
         self._panel.set_paused(False)
+        self._panel.set_message()
         self._draw_frame()
 
     def _build(self, record=False):
@@ -125,11 +126,17 @@ class RunController(object):
         params = self._panel.params()
         if not check_reflection_solvable(params['gamma'], params['mach'],
                                          params['angle']):
-            self._panel.set_configuration_error(
-                "Adjust Mach, gamma, or the deflection angle.")
+            self._panel.set_message(
+                "Invalid configuration",
+                "Adjust Mach, gamma, or the deflection angle.", error=True)
             return False
         session = ReflectionSession(**params)
-        self._panel.set_configuration_error("")
+        if session.shock.reflected_shock_hits_top():
+            self._panel.set_message(
+                "Three-zone analytic solution does not apply",
+                "The reflected shock reaches the top inlet.")
+        else:
+            self._panel.set_message()
         self._timer.stop()
         self._finish_movie()
         self._cell_type = params['cell_type']

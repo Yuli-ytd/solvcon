@@ -117,21 +117,36 @@ class StatusReadoutTC(unittest.TestCase):
         panel.set_status(None, None, None)
         self.assertEqual("-", panel._run._cfl.text())
 
-    def test_the_configuration_error_is_shown_and_cleared(self):
+    def test_messages_share_the_banner_and_clear_error_outlines(self):
         panel = SolutionPanel()
-        error = panel._freestream._configuration_error
-        self.assertTrue(error.isHidden())
+        box = panel._freestream
+        message = box._message
+        outlines = (box._gamma_outline, box._mach_outline,
+                    box._angle_outline)
+        self.assertTrue(message.isHidden())
 
-        panel.set_configuration_error(
-            "Adjust Mach, gamma, or the deflection angle.")
-        self.assertFalse(error.isHidden())
+        panel.set_message("Invalid configuration",
+                          "Adjust Mach, gamma, or the deflection angle.",
+                          error=True)
+        self.assertFalse(message.isHidden())
+        self.assertEqual("Invalid configuration", box._message_title.text())
         self.assertEqual(
             "Adjust Mach, gamma, or the deflection angle.",
-            panel._freestream._error_message.text())
+            box._message_detail.text())
+        self.assertTrue(all(field.styleSheet() for field in outlines))
+        style = message.styleSheet()
 
-        panel.set_configuration_error("")
-        self.assertTrue(error.isHidden())
-        self.assertEqual("", panel._freestream._error_message.text())
+        panel.set_message("Run ready", "The mesh is ready.")
+        self.assertFalse(message.isHidden())
+        self.assertEqual("Run ready", box._message_title.text())
+        self.assertEqual("The mesh is ready.", box._message_detail.text())
+        self.assertEqual(style, message.styleSheet())
+        self.assertTrue(all(not field.styleSheet() for field in outlines))
+
+        panel.set_message()
+        self.assertTrue(message.isHidden())
+        self.assertEqual("", box._message_title.text())
+        self.assertEqual("", box._message_detail.text())
 
     def test_the_cfl_field_colors_without_an_analytic_column(self):
         # The zone table judges a field against the analytic answer, which
