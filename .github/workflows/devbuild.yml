@@ -244,6 +244,7 @@ jobs:
         echo "::endgroup::"
 
     - name: make pytest BUILD_QT=ON
+      id: pytest_qt
       run: |
         echo "::group::make pytest BUILD_QT=ON"
         python3 -c "import solvcon; assert solvcon.HAS_PILOT == True"
@@ -268,6 +269,10 @@ jobs:
         # default either way, so any window stays off the screen.
         make ${{ github.event_name == 'pull_request' && 'pytest-fast' || 'pytest' }} ${JOB_MAKE_ARGS}
         echo "::endgroup::"
+
+    - name: Diagnose theme GC after Qt pytest failure
+      if: ${{ failure() && matrix.os == 'ubuntu-24.04' && steps.pytest_qt.outcome == 'failure' }}
+      run: python3 contrib/ci/probe_theme_gc.py
 
     - name: make pilot
       run: |
