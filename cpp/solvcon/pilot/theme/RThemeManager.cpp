@@ -252,6 +252,28 @@ void RThemeManager::setApplicationStyleSheet(QString const & sheet)
         return;
     }
 
+    // Qt repolishes a snapshot of raw widget pointers. Keep their Python
+    // wrappers alive if an event handler collects otherwise unowned widgets.
+    pybind11::gil_scoped_acquire const gil;
+    int const gc_enabled = PyGC_Disable();
+    pybind11::object widgets;
+    try
+    {
+        widgets = pybind11::module_::import("PySide6.QtWidgets").attr("QApplication").attr("allWidgets")();
+    }
+    catch (...)
+    {
+        if (gc_enabled != 0)
+        {
+            PyGC_Enable();
+        }
+        throw;
+    }
+    if (gc_enabled != 0)
+    {
+        PyGC_Enable();
+    }
+
     m_style_sheet = sheet;
     qApp->setStyleSheet(sheet);
 }

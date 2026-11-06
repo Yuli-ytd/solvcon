@@ -4,9 +4,11 @@
 
 import os
 import re
+import subprocess
+import textwrap
 import unittest
 
-from solvcon import testing
+from solvcon import system, testing
 
 try:
     from solvcon import pilot
@@ -196,6 +198,52 @@ class ThemePolishTC(unittest.TestCase):
     def test_system_look_clears_the_stylesheet(self):
         self.mgr.set_look("system")
         self.assertEqual(self.app.styleSheet(), "")
+
+    def test_collecting_unowned_widgets_during_a_switch_is_safe(self):
+        code = textwrap.dedent('''\
+            import gc
+            import weakref
+            from PySide6.QtCore import QEvent
+            from PySide6.QtGui import QPalette
+            from PySide6.QtWidgets import QApplication, QWidget
+            from solvcon import pilot
+
+            manager = pilot.RManager.instance.setUp()
+            manager.set_look("curated")
+            manager.set_theme("light")
+            armed = False
+            collections = 0
+
+            class Collector(QWidget):
+                def event(self, event):
+                    global collections
+                    if armed and event.type() == QEvent.Type.StyleChange:
+                        gc.collect()
+                        collections += 1
+                    return super().event(event)
+
+            gc.disable()
+            collectors = [Collector() for _ in range(20)]
+            victims = [QWidget() for _ in range(100)]
+            references = [weakref.ref(widget) for widget in victims]
+            for widget in collectors + victims:
+                widget.ensurePolished()
+            for widget in victims:
+                widget.cycle = widget
+            del widget, victims
+
+            armed = True
+            manager.set_theme("dark")
+            assert collections > 0
+            assert not gc.isenabled()
+            assert QApplication.palette().color(
+                QPalette.Window).lightness() < 100
+            gc.collect()
+            assert all(reference() is None for reference in references)
+        ''')
+        result = subprocess.run(system.python_command('-c', code),
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_mode_and_look_persist_across_sessions(self):
         self.mgr.set_theme("dark")
