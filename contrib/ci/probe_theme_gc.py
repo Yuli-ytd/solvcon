@@ -1,7 +1,7 @@
 # Copyright (c) 2026, solvcon team <contact@solvcon.net>
 # BSD 3-Clause License, see COPYING
 
-"""Compare message-test isolation and GC protection for theme crashes."""
+"""Compare a control, message-test isolation, and GC protection."""
 
 import gc
 import os
@@ -12,7 +12,6 @@ import sys
 import pytest
 
 
-RUNS = 3
 MESSAGE_TEST = (
     'tests/apps/obsrefl/test_panel.py::StatusReadoutTC::'
     'test_messages_share_the_banner_and_clear_error_outlines')
@@ -20,11 +19,15 @@ MESSAGE_TEST = (
 
 def pytest_addoption(parser):
     parser.addoption('--theme-gc-probe', default='protect',
-                     choices=('skip-message', 'protect'))
+                     choices=('control', 'skip-message', 'protect'))
 
 
 def pytest_collection_finish(session):
     mode = session.config.getoption('theme_gc_probe')
+    if mode == 'control':
+        print('Theme probe: control (all tests enabled, GC unchanged).',
+              flush=True)
+        return
     if mode == 'skip-message':
         for item in session.items:
             if item.nodeid == MESSAGE_TEST:
@@ -58,9 +61,10 @@ def main():
         f'RUNENV=PYTHONPATH={root}{os.pathsep}{plugin_dir}',
     ]
     codes = []
-    modes = ('skip-message', 'protect', 'protect')
+    modes = ('control', 'control', 'skip-message', 'protect', 'protect')
+    runs = len(modes)
     for attempt, mode in enumerate(modes, 1):
-        print(f"::group::Theme probe {attempt}/{RUNS} ({mode})", flush=True)
+        print(f"::group::Theme probe {attempt}/{runs} ({mode})", flush=True)
         options = ('PYTEST_OPTS=-v -s -p probe_theme_gc '
                    f'--theme-gc-probe={mode}')
         result = subprocess.run(command + [options], cwd=root, check=False)
@@ -69,8 +73,8 @@ def main():
         print("::endgroup::", flush=True)
 
     passed = codes.count(0)
-    print(f"Theme GC probe: {passed}/{RUNS} runs passed.", flush=True)
-    return 0 if passed == RUNS else 1
+    print(f"Theme GC probe: {passed}/{runs} runs passed.", flush=True)
+    return 0 if passed == runs else 1
 
 
 if __name__ == '__main__':
