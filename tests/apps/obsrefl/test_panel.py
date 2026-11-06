@@ -19,6 +19,7 @@ try:
     from solvcon.apps.obsrefl import ReflectionSession
     # The panel needs the pilot, so import it only with the pilot.
     if pilot.enable:
+        from PySide6.QtCore import QCoreApplication, QEvent
         from solvcon.apps.obsrefl import _panel
         from solvcon.apps.obsrefl._panel import SolutionPanel
         from solvcon.pilot.visual import _movie
@@ -119,6 +120,13 @@ class StatusReadoutTC(unittest.TestCase):
 
     def test_messages_share_the_banner_and_clear_error_outlines(self):
         panel = SolutionPanel()
+
+        def delete_panel():
+            panel.deleteLater()
+            QCoreApplication.sendPostedEvents(
+                panel, QEvent.Type.DeferredDelete)
+
+        self.addCleanup(delete_panel)
         box = panel._freestream
         message = box._message
         outlines = (box._gamma_outline, box._mach_outline,
