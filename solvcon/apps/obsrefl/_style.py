@@ -14,23 +14,23 @@ class Rules(pilot.RuleCatalog):
     """Style roles used by the reflection controls."""
 
     @staticmethod
-    def configuration_error(shades):
+    def message(shades):
         return f"""
-            QFrame#configurationError {{
+            QFrame#message {{
                 border: 1px solid {shades.bright_text.name()};
                 border-radius: 6px;
             }}
-            QLabel#configurationErrorIcon {{
+            QLabel#messageIcon {{
                 background-color: {shades.bright_text.name()};
                 border-radius: 9px;
                 color: {shades.on_base.name()};
                 font-weight: bold;
             }}
-            QLabel#configurationErrorTitle {{
+            QLabel#messageTitle {{
                 color: {shades.bright_text.name()};
                 font-weight: bold;
             }}
-            QLabel#configurationErrorDetail {{
+            QLabel#messageDetail {{
                 color: {shades.text.name()};
             }}
         """

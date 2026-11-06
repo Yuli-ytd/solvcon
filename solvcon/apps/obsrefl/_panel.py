@@ -182,8 +182,8 @@ class FreeStreamBox(FoldBox):
         self._mach_outline = _outline_field(self._mach)
         self._angle_outline = _outline_field(self._angle)
 
-        self._configuration_error, self._error_message = (
-            self._make_configuration_error())
+        self._message, self._message_title, self._message_detail = (
+            self._make_message())
 
         form = QFormLayout()
         form.addRow("gamma", self._gamma_outline)
@@ -191,7 +191,7 @@ class FreeStreamBox(FoldBox):
         form.addRow("pressure", self._pressure)
         form.addRow("Mach", self._mach_outline)
         form.addRow("deflection angle", self._angle_outline)
-        form.addRow(self._configuration_error)
+        form.addRow(self._message)
         self.set_content_layout(form)
 
     def params(self):
@@ -201,30 +201,36 @@ class FreeStreamBox(FoldBox):
                     mach=self._mach.value(),
                     angle=self._angle.value())
 
-    def set_configuration_error(self, message):
-        """Show a configuration error, or clear it with an empty message."""
-        self._error_message.setText(message)
-        self._configuration_error.setVisible(bool(message))
+    def set_message(self, title="", detail="", *, error=False):
+        """Show a message, marking invalid inputs when ``error`` is true.
+
+        An empty title and detail clear the message and input outlines.
+        """
+        self._message_title.setText(title)
+        self._message_detail.setText(detail)
+        visible = bool(title or detail)
+        self._message.setVisible(visible)
         style = ""
-        if message:
+        if error and visible:
             style = Rules.sheet(self, "error_outline")
         self._gamma_outline.setStyleSheet(style)
         self._mach_outline.setStyleSheet(style)
         self._angle_outline.setStyleSheet(style)
 
-    def _make_configuration_error(self):
+    def _make_message(self):
         frame = QFrame()
-        frame.setObjectName("configurationError")
+        frame.setObjectName("message")
 
         icon = QLabel("!")
-        icon.setObjectName("configurationErrorIcon")
+        icon.setObjectName("messageIcon")
         icon.setAlignment(Qt.AlignCenter)
         icon.setFixedSize(18, 18)
 
-        title = QLabel("Invalid configuration")
-        title.setObjectName("configurationErrorTitle")
+        title = QLabel()
+        title.setObjectName("messageTitle")
+        title.setWordWrap(True)
         detail = QLabel()
-        detail.setObjectName("configurationErrorDetail")
+        detail.setObjectName("messageDetail")
         detail.setWordWrap(True)
 
         text_layout = QVBoxLayout()
@@ -239,9 +245,9 @@ class FreeStreamBox(FoldBox):
         row_layout.addWidget(icon, 0, Qt.AlignTop)
         row_layout.addLayout(text_layout, 1)
 
-        frame.setStyleSheet(Rules.sheet(self, "configuration_error"))
+        frame.setStyleSheet(Rules.sheet(self, "message"))
         frame.hide()
-        return frame, detail
+        return frame, title, detail
 
 
 class NumericsBox(FoldBox):
@@ -823,11 +829,11 @@ class SolutionPanel(QScrollArea):
         """Collect the current control values for the solver driver."""
         return {**self._freestream.params(), **self._numerics.params()}
 
-    def set_configuration_error(self, message):
-        """Show a configuration error, or clear it with an empty message."""
-        self._freestream.set_configuration_error(message)
-        if message:
-            self.ensureWidgetVisible(self._freestream._configuration_error)
+    def set_message(self, title="", detail="", *, error=False):
+        """Show a message, or clear it with an empty title and detail."""
+        self._freestream.set_message(title, detail, error=error)
+        if title or detail:
+            self.ensureWidgetVisible(self._freestream._message)
 
     def field(self):
         return self._field.field()

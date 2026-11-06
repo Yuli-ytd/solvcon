@@ -15,6 +15,7 @@ import unittest
 
 from solvcon.apps.obsrefl import ObliqueShock, ObliqueShockRelation
 from solvcon.apps.obsrefl._driver import check_reflection_solvable
+from solvcon.mesh import RectDomainMesher
 
 
 class ObliqueShockRelationTC(unittest.TestCase):
@@ -133,6 +134,34 @@ class ObliqueShockDriverTC(unittest.TestCase):
     def test_numerical_requires_constants(self):
         with self.assertRaises(ValueError):
             ObliqueShock().build_numerical()
+
+    def test_only_a_reflected_shock_crossing_the_inlet_conflicts(self):
+        for angle, ll, ur, hits_top in (
+                (10.0, (0.0, 0.0), (4.0, 1.0), False),
+                (15.0, (0.0, 0.0), (4.0, 1.0), True),
+                (15.0, (0.0, 0.0), (3.0, 1.0), False),
+                (15.0, (-2.0, 3.0), (2.0, 4.0), True),
+                (15.0, (0.0, 0.0), (4.0, 2.0), False),
+                (15.0, (0.0, 0.0), (1.0, 1.0), False)):
+            with self.subTest(angle=angle, ll=ll, ur=ur):
+                shock = ObliqueShock()
+                shock.build_constant(angle=angle)
+                shock.mesher = RectDomainMesher(ll=ll, ur=ur)
+                self.assertEqual(hits_top, shock.reflected_shock_hits_top())
+
+    def test_a_shock_at_the_corner_leaves_no_conflicting_inlet(self):
+        shock = ObliqueShock()
+        shock.build_constant(angle=15.0)
+        shock.mesher = RectDomainMesher()
+        xtop = shock.shock_path()[-1][0]
+        shock.mesher = RectDomainMesher(ur=(xtop, 1.0))
+        self.assertFalse(shock.reflected_shock_hits_top())
+
+    def test_the_reflected_exit_requires_a_mesh(self):
+        shock = ObliqueShock()
+        shock.build_constant()
+        with self.assertRaisesRegex(ValueError, "mesh is not built"):
+            shock.reflected_shock_hits_top()
 
     def test_constants_set_post_shock_state(self):
         shock = ObliqueShock()
