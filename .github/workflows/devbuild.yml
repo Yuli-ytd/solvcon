@@ -244,30 +244,21 @@ jobs:
         echo "::endgroup::"
 
     - name: make pytest BUILD_QT=ON
-      run: |
-        echo "::group::make pytest BUILD_QT=ON"
-        python3 -c "import solvcon; assert solvcon.HAS_PILOT == True"
-        JOB_MAKE_ARGS="${JOB_MAKE_ARGS} VERBOSE=1"
-        if [ "${{ matrix.os }}" == "macos-26" ] ; then \
-          # PySide6 installed by pip will bundle with a prebuilt Qt,
-          # this will cause duplicated symbol.
-          # Solve this issue by removed PySide6 prebuilt Qt library
-          PYSIDE6_PATH=$(python3 -c "import sys, os, PySide6; sys.stdout.write(os.path.dirname(PySide6.__file__))")
-          echo "pyside6 path: ${PYSIDE6_PATH}"
-          rm -rf ${PYSIDE6_PATH}/Qt/lib/*.framework
-          # maunally add homebrew's Qt rpath to PySide6
-          install_name_tool -add_rpath $(qtpaths --install-prefix)/lib ${PYSIDE6_PATH}/QtWidgets.abi3.so
-          install_name_tool -add_rpath $(qtpaths --install-prefix)/lib ${PYSIDE6_PATH}/QtGui.abi3.so
-          install_name_tool -add_rpath $(qtpaths --install-prefix)/lib ${PYSIDE6_PATH}/QtCore.abi3.so
-        fi
-        # Without the pilot every pilot test skips, so fail here instead.
-        python3 -c "from solvcon import pilot; pilot.require('the Qt test step')"
-        # A pull request skips tests/gui here, because run_pilot_pytest below
-        # runs it seconds later in the pilot binary. A push and the nightly
-        # run the whole suite in both Qt hosts. SOLVCON_TEST_SHOW_WINDOWS is left at the
-        # default either way, so any window stays off the screen.
-        make ${{ github.event_name == 'pull_request' && 'pytest-fast' || 'pytest' }} ${JOB_MAKE_ARGS}
-        echo "::endgroup::"
+      id: qt_pytest
+      run: bash contrib/ci/pytest-qt.sh ${{ github.event_name == 'pull_request' && 'pytest-fast' || 'pytest' }}
+
+    - name: Collect Linux native stacks
+      if: ${{ !cancelled() && runner.os == 'Linux' && steps.qt_pytest.outcome == 'failure' }}
+      run: bash contrib/ci/collect-native-stack.sh
+
+    - name: Upload Linux native stacks
+      if: ${{ !cancelled() && runner.os == 'Linux' && steps.qt_pytest.outcome == 'failure' }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: linux-native-stack-${{ github.run_id }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/solvcon-native/*.txt
+        retention-days: 7
+        if-no-files-found: warn
 
     - name: make pilot
       run: |
